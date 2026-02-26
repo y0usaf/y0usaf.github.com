@@ -257,7 +257,7 @@
   </main>
 
   <script>
-    const RESUME_TEX_URL = "https://raw.githubusercontent.com/y0usaf/y0usaf.github.com/main/resume.tex";
+    const RESUME_TEX_URL = "https://raw.githubusercontent.com/y0usaf/resume/main/resume_samiansari.tex";
 
     function escapeHtml(value) {
       return value
@@ -299,6 +299,7 @@
         "Experience": /\\section\{Experience\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
         "Education": /\\section\{Education\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
         "Projects": /\\section\{Projects\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
+        "Projects \\& Contributions": /\\section\{Projects \\& Contributions\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
         "Technical Skills": /\\section\{Technical Skills\}([\s\S]*?)(?=\\section\{|\\end\{document\})/
       };
 
@@ -337,6 +338,32 @@
     }
 
     function parseExperience(section) {
+      const experienceEntries = [...section.matchAll(/\\experience\{([^{}]*)\}\{([^{}]*)\}\{([^{}]*)\}\{([^{}]*)\}([\s\S]*?)(?=\\hspace\{0\.15in\}[\s\S]*?\\experience\{|$)/g)];
+      if (experienceEntries.length > 0) {
+        const grouped = [];
+        const byCompany = new Map();
+
+        for (const match of experienceEntries) {
+          const title = cleanTex(match[1]);
+          const dates = cleanTex(match[2]);
+          const company = cleanTex(match[3]);
+          const location = cleanTex(match[4]);
+          const body = match[5] || "";
+          const bullets = [...body.matchAll(/\\item\s+([^\n]+)/g)].map((m) => cleanTex(m[1]));
+
+          const companyKey = `${company}::${location}`;
+          if (!byCompany.has(companyKey)) {
+            const entry = { company, location, roles: [] };
+            byCompany.set(companyKey, entry);
+            grouped.push(entry);
+          }
+
+          byCompany.get(companyKey).roles.push({ title, dates, bullets });
+        }
+
+        return grouped;
+      }
+
       const companies = [];
       const companyRe = /\\resumeSubheading\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}([\s\S]*?)(?=\s*\\resumeSubheading|\s*\\resumeSubHeadingListEnd|$)/g;
       let companyMatch;
@@ -370,6 +397,16 @@
     }
 
     function parseProjects(section) {
+      const modernEntries = [...section.matchAll(/\\href\{([^{}]+)\}\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*--\s*([^\n]+)/g)];
+      if (modernEntries.length > 0) {
+        return modernEntries.map((m) => ({
+          name: cleanTex(m[2]),
+          stack: "",
+          dates: "",
+          bullets: [cleanTex(m[3])]
+        }));
+      }
+
       const entries = [];
       const re = /\\resumeProjectHeading\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*)\}([\s\S]*?)(?=\\resumeProjectHeading|\\resumeSubHeadingListEnd|$)/g;
       let m;
@@ -383,7 +420,13 @@
     }
 
     function parseSkills(section) {
-      return [...section.matchAll(/\\textbf\{([^{}]*)\}\{:\s*([^{}]*)\}/g)].map((m) => ({
+      const classic = [...section.matchAll(/\\textbf\{([^{}]*)\}\{:\s*([^{}]*)\}/g)].map((m) => ({
+        label: cleanTex(m[1]),
+        values: cleanTex(m[2])
+      }));
+      if (classic.length > 0) return classic;
+
+      return [...section.matchAll(/\\textbf\{([^{}]*)\}\s*:\s*([^\n]+)/g)].map((m) => ({
         label: cleanTex(m[1]),
         values: cleanTex(m[2])
       }));
@@ -706,7 +749,7 @@
           <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-projects">Projects</button></li>
           <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-skills">Skills</button></li>
           <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-github">GitHub</button></li>
-          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-contrib">Contributions</button></li>
+          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-contrib">GitHub Contributions</button></li>
         </ul>
 
         <section id="panel-experience" class="panel active">
@@ -735,7 +778,7 @@
         </section>
 
         <section id="panel-contrib" class="panel">
-          <h2>Recent External Contributions</h2>
+          <h2>GitHub Contributions</h2>
           <div id="github-contrib" class="notice">Scanning recent contribution activity...</div>
         </section>
       `;
@@ -755,7 +798,7 @@
           header: parseHeader(tex),
           experience: parseExperience(sectionBlock(tex, "Experience")),
           education: parseEducation(sectionBlock(tex, "Education")),
-          projects: parseProjects(sectionBlock(tex, "Projects")),
+          projects: parseProjects(sectionBlock(tex, "Projects") || sectionBlock(tex, "Projects \\& Contributions")),
           skills: parseSkills(sectionBlock(tex, "Technical Skills"))
         };
 
