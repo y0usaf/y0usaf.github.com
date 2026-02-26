@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume</title>
+  <style>
+    :root {
+      --ink: #111111;
+      --paper: #f6f1e8;
+      --card: #fffef8;
+      --accent: #1b5e5a;
+      --line: #d5ccb9;
+      --muted: #5b5b57;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 0%, #e6dcc8, transparent 40%),
+        radial-gradient(circle at 80% 15%, #dce8d4, transparent 35%),
+        var(--paper);
+      font-family: "Georgia", "Times New Roman", serif;
+      line-height: 1.5;
+    }
+
+    .shell {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 48px 20px 72px;
+    }
+
+    header {
+      border-bottom: 2px solid var(--line);
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4.2vw, 3.1rem);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .contact {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .contact a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+
+    .contact a:hover { border-bottom-color: var(--accent); }
+
+    section { margin-top: 24px; }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .card-top, .role-top {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    h3, h4 { margin: 0; }
+    h3 { font-size: 1.08rem; }
+    h4 { font-size: 1rem; margin-top: 10px; }
+
+    p { margin: 4px 0 0; }
+    .meta { color: var(--muted); }
+
+    ul { margin: 8px 0 0; padding-left: 18px; }
+    li { margin: 5px 0; }
+
+    .skill-row {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 0;
+    }
+
+    .skill-row:last-child { border-bottom: 0; }
+
+    .notice {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 680px) {
+      .shell { padding-top: 32px; }
+      .card { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell" id="app">
+    <div class="notice">Loading latest resume...</div>
+  </main>
+
+  <script>
+    const RESUME_TEX_URL = "https://raw.githubusercontent.com/y0usaf/y0usaf.github.com/main/resume.tex";
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function cleanTex(text) {
+      return text
+        .replaceAll("\\\\&", "&")
+        .replaceAll("\\\\%", "%")
+        .replaceAll("~", " ")
+        .replace(/\$\|\$/g, " | ")
+        .replace(/\$/g, "")
+        .replace(/\\\\textbf\{([^{}]*)\}/g, "$1")
+        .replace(/\\\\textit\{([^{}]*)\}/g, "$1")
+        .replace(/\\\\emph\{([^{}]*)\}/g, "$1")
+        .replace(/\\\\underline\{([^{}]*)\}/g, "$1")
+        .replace(/\\\\href\{([^{}]*)\}\{([^{}]*)\}/g, "$2")
+        .replace(/\\\\scshape/g, "")
+        .replace(/\\\\Huge/g, "")
+        .replace(/\\\\small/g, "")
+        .replace(/\\\\vspace\{[^{}]*\}/g, "")
+        .replace(/\\\\[a-zA-Z]+/g, "")
+        .replace(/[{}]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function stripLineComments(text) {
+      return text.replace(/^\s*%.*\n?/gm, "");
+    }
+
+    function sectionBlock(tex, title) {
+      const re = new RegExp(`\\\\section\\\\{${title.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")}\\\\}([\\s\\S]*?)(?=\\\\section\\\\{|\\\\end\\\\{document\\\\})`);
+      const match = tex.match(re);
+      return match ? match[1] : "";
+    }
+
+    function parseHeader(tex) {
+      const center = tex.match(/\\begin\{center\}([\s\S]*?)\\end\{center\}/);
+      const block = center ? center[1] : "";
+
+      const nameMatch = block.match(/\\textbf\{\\Huge\s+\\scshape\s+([^}]*)\}/);
+      const name = nameMatch ? cleanTex(nameMatch[1]) : "Your Name";
+
+      const hrefs = [...block.matchAll(/\\href\{([^{}]+)\}\{((?:[^{}]|\{[^{}]*\})*)\}/g)];
+      let email = "";
+      let linkedin = "";
+      let github = "";
+
+      for (const [, rawLink, rawLabel] of hrefs) {
+        let link = rawLink;
+        const label = cleanTex(rawLabel);
+        if (link.includes("...") && /^https?:\/\//.test(label)) link = label;
+
+        if (link.startsWith("mailto:")) email = link.slice("mailto:".length);
+        else if (link.includes("linkedin.com")) linkedin = link;
+        else if (link.includes("github.com")) github = link;
+      }
+
+      const phoneMatch = block.match(/\\small\s*([^$\\]+)/);
+      const phone = phoneMatch ? cleanTex(phoneMatch[1]) : "";
+
+      return { name, phone, email, linkedin, github };
+    }
+
+    function parseExperience(section) {
+      const companies = [];
+      const companyRe = /\\resumeSubheading\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}([\s\S]*?)(?=\s*\\resumeSubheading|\s*\\resumeSubHeadingListEnd|$)/g;
+      let companyMatch;
+
+      while ((companyMatch = companyRe.exec(section)) !== null) {
+        const [, company, location, _unused1, _unused2, body] = companyMatch;
+        const roles = [];
+
+        const roleRe = /\\resumeSubSubheading\s*\{([^{}]*)\}\s*\{([^{}]*)\}([\s\S]*?)(?=\s*\\resumeSubSubheading|\s*\\resumeSubheading|\s*\\resumeSubHeadingListEnd|$)/g;
+        let roleMatch;
+        while ((roleMatch = roleRe.exec(body)) !== null) {
+          const [, title, dates, roleBody] = roleMatch;
+          const bullets = [...roleBody.matchAll(/\\resumeItem\{([^{}]*)\}/g)].map((m) => cleanTex(m[1]));
+          roles.push({ title: cleanTex(title), dates: cleanTex(dates), bullets });
+        }
+
+        companies.push({ company: cleanTex(company), location: cleanTex(location), roles });
+      }
+
+      return companies;
+    }
+
+    function parseEducation(section) {
+      const entries = [];
+      const re = /\\resumeSubheading\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
+      let m;
+      while ((m = re.exec(section)) !== null) {
+        entries.push({ school: cleanTex(m[1]), location: cleanTex(m[2]), degree: cleanTex(m[3]), dates: cleanTex(m[4]) });
+      }
+      return entries;
+    }
+
+    function parseProjects(section) {
+      const entries = [];
+      const re = /\\resumeProjectHeading\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*)\}([\s\S]*?)(?=\\resumeProjectHeading|\\resumeSubHeadingListEnd|$)/g;
+      let m;
+      while ((m = re.exec(section)) !== null) {
+        const heading = cleanTex(m[1]);
+        const [name, stack = ""] = heading.includes("|") ? heading.split("|").map((x) => x.trim()) : [heading, ""];
+        const bullets = [...m[3].matchAll(/\\resumeItem\{([^{}]*)\}/g)].map((x) => cleanTex(x[1]));
+        entries.push({ name, stack, dates: cleanTex(m[2]), bullets });
+      }
+      return entries;
+    }
+
+    function parseSkills(section) {
+      return [...section.matchAll(/\\textbf\{([^{}]*)\}\{:\s*([^{}]*)\}/g)].map((m) => ({
+        label: cleanTex(m[1]),
+        values: cleanTex(m[2])
+      }));
+    }
+
+    function render(data) {
+      const app = document.getElementById("app");
+      document.title = data.header.name || "Resume";
+
+      const contact = [];
+      if (data.header.phone) contact.push(`<span>${escapeHtml(data.header.phone)}</span>`);
+      if (data.header.email) {
+        const email = escapeHtml(data.header.email);
+        contact.push(`<a href="mailto:${email}">${email}</a>`);
+      }
+      if (data.header.linkedin) contact.push(`<a href="${escapeHtml(data.header.linkedin)}" target="_blank" rel="noreferrer">LinkedIn</a>`);
+      if (data.header.github) contact.push(`<a href="${escapeHtml(data.header.github)}" target="_blank" rel="noreferrer">GitHub</a>`);
+
+      const experienceHtml = data.experience.map((company) => {
+        const roles = company.roles.map((role) => `
+          <article class="role">
+            <div class="role-top">
+              <h4>${escapeHtml(role.title)}</h4>
+              <p>${escapeHtml(role.dates)}</p>
+            </div>
+            <ul>${role.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>
+          </article>
+        `).join("");
+
+        return `
+          <article class="card">
+            <div class="card-top">
+              <h3>${escapeHtml(company.company)}</h3>
+              <p>${escapeHtml(company.location)}</p>
+            </div>
+            ${roles}
+          </article>
+        `;
+      }).join("");
+
+      const educationHtml = data.education.map((entry) => `
+        <article class="card">
+          <div class="card-top">
+            <h3>${escapeHtml(entry.school)}</h3>
+            <p>${escapeHtml(entry.location)}</p>
+          </div>
+          <p class="meta">${escapeHtml(entry.degree)}</p>
+          <p class="meta">${escapeHtml(entry.dates)}</p>
+        </article>
+      `).join("");
+
+      const projectsHtml = data.projects.map((project) => `
+        <article class="card">
+          <div class="card-top">
+            <h3>${escapeHtml(project.name)}</h3>
+            <p>${escapeHtml(project.dates)}</p>
+          </div>
+          <p class="meta">${escapeHtml(project.stack)}</p>
+          <ul>${project.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>
+        </article>
+      `).join("");
+
+      const skillsHtml = data.skills.map((skill) => `
+        <article class="skill-row">
+          <h3>${escapeHtml(skill.label)}</h3>
+          <p>${escapeHtml(skill.values)}</p>
+        </article>
+      `).join("");
+
+      app.innerHTML = `
+        <header>
+          <h1>${escapeHtml(data.header.name)}</h1>
+          <div class="contact">${contact.join(" ")}</div>
+        </header>
+
+        <section id="experience">
+          <h2>Experience</h2>
+          ${experienceHtml}
+        </section>
+
+        <section id="education">
+          <h2>Education</h2>
+          ${educationHtml}
+        </section>
+
+        <section id="projects">
+          <h2>Projects</h2>
+          ${projectsHtml}
+        </section>
+
+        <section id="skills">
+          <h2>Technical Skills</h2>
+          ${skillsHtml}
+        </section>
+      `;
+    }
+
+    async function loadResume() {
+      const app = document.getElementById("app");
+      try {
+        const response = await fetch(RESUME_TEX_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const tex = stripLineComments(await response.text());
+        const data = {
+          header: parseHeader(tex),
+          experience: parseExperience(sectionBlock(tex, "Experience")),
+          education: parseEducation(sectionBlock(tex, "Education")),
+          projects: parseProjects(sectionBlock(tex, "Projects")),
+          skills: parseSkills(sectionBlock(tex, "Technical Skills"))
+        };
+
+        render(data);
+      } catch (error) {
+        app.innerHTML = `<div class="notice">Failed to load resume from <code>${escapeHtml(RESUME_TEX_URL)}</code><br>${escapeHtml(String(error))}</div>`;
+      }
+    }
+
+    loadResume();
+  </script>
+</body>
+</html>
