@@ -294,19 +294,15 @@
       return text.replace(/^\s*%.*\n?/gm, "");
     }
 
-    function sectionBlock(tex, title) {
-      const sections = {
-        "Experience": /\\section\{Experience\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
-        "Education": /\\section\{Education\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
-        "Projects": /\\section\{Projects\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
-        "Projects \\& Contributions": /\\section\{Projects \\& Contributions\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
-        "Technical Skills": /\\section\{Technical Skills\}([\s\S]*?)(?=\\section\{|\\end\{document\})/
-      };
-
-      const re = sections[title];
-      if (!re) return "";
-      const match = tex.match(re);
-      return match ? match[1] : "";
+    function extractSections(tex) {
+      const sections = {};
+      const re = /\\section\{([^}]*)\}([\s\S]*?)(?=\\section\{|\\end\{document\})/g;
+      let match;
+      while ((match = re.exec(tex)) !== null) {
+        const title = cleanTex(match[1]);
+        sections[title] = match[2];
+      }
+      return sections;
     }
 
     function parseHeader(tex) {
@@ -386,16 +382,6 @@
       return companies;
     }
 
-    function parseEducation(section) {
-      const entries = [];
-      const re = /\\resumeSubheading\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
-      let m;
-      while ((m = re.exec(section)) !== null) {
-        entries.push({ school: cleanTex(m[1]), location: cleanTex(m[2]), degree: cleanTex(m[3]), dates: cleanTex(m[4]) });
-      }
-      return entries;
-    }
-
     function parseProjects(section) {
       const modernEntries = [...section.matchAll(/\\href\{([^{}]+)\}\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*--\s*([^\n]+)/g)];
       if (modernEntries.length > 0) {
@@ -430,6 +416,19 @@
         label: cleanTex(m[1]),
         values: cleanTex(m[2])
       }));
+    }
+
+    function parseSpeaking(section) {
+      const entries = [];
+      const re = /\{\\bfseries\s*([^}]*)\}\s*\\hfill\s*\{\\small\s*([^}]*)\}\s*\\\\([\s\S]*?)(?=\n\s*\\sectionspace|$)/g;
+      let m;
+      while ((m = re.exec(section)) !== null) {
+        const title = cleanTex(m[1]);
+        const dates = cleanTex(m[2]);
+        const details = cleanTex((m[3] || "").replace(/\\hspace\{[^}]*\}/g, " "));
+        entries.push({ title, dates, details });
+      }
+      return entries;
     }
 
     function parseGitHubUsername(url) {
@@ -708,17 +707,6 @@
         `;
       }).join("");
 
-      const educationHtml = data.education.map((entry) => `
-        <article class="card">
-          <div class="card-top">
-            <h3>${escapeHtml(entry.school)}</h3>
-            <p>${escapeHtml(entry.location)}</p>
-          </div>
-          <p class="meta">${escapeHtml(entry.degree)}</p>
-          <p class="meta">${escapeHtml(entry.dates)}</p>
-        </article>
-      `).join("");
-
       const projectsHtml = data.projects.map((project) => `
         <article class="card">
           <div class="card-top">
@@ -737,6 +725,49 @@
         </article>
       `).join("");
 
+      const speakingHtml = data.speaking.map((item) => `
+        <article class="card">
+          <div class="card-top">
+            <h3>${escapeHtml(item.title)}</h3>
+            <p>${escapeHtml(item.dates)}</p>
+          </div>
+          <p class="meta">${escapeHtml(item.details)}</p>
+        </article>
+      `).join("");
+
+      const tabs = [];
+      const panels = [];
+      if (data.experience.length) {
+        tabs.push({ id: "panel-experience", label: "Experience" });
+        panels.push(`<section id="panel-experience" class="panel"><h2>Experience</h2>${experienceHtml}</section>`);
+      }
+      if (data.projects.length) {
+        tabs.push({ id: "panel-projects", label: "Projects" });
+        panels.push(`<section id="panel-projects" class="panel"><h2>Projects</h2>${projectsHtml}</section>`);
+      }
+      if (data.skills.length) {
+        tabs.push({ id: "panel-skills", label: "Skills" });
+        panels.push(`<section id="panel-skills" class="panel"><h2>Technical Skills</h2>${skillsHtml}</section>`);
+      }
+      if (data.speaking.length) {
+        tabs.push({ id: "panel-speaking", label: "Speaking" });
+        panels.push(`<section id="panel-speaking" class="panel"><h2>Speaking</h2>${speakingHtml}</section>`);
+      }
+
+      tabs.push({ id: "panel-github", label: "GitHub" });
+      panels.push(`
+        <section id="panel-github" class="panel">
+          <h2>GitHub Repos</h2>
+          <div id="github-data" class="notice">Loading repositories...</div>
+          <h2>GitHub Contributions</h2>
+          <div id="github-contrib" class="notice">Scanning recent contribution activity...</div>
+        </section>
+      `);
+
+      const tabButtons = tabs
+        .map((tab, idx) => `<li><button class="tab-btn${idx === 0 ? " active" : ""}" role="tab" aria-selected="${idx === 0 ? "true" : "false"}" data-tab="${tab.id}">${tab.label}</button></li>`)
+        .join("");
+
       app.innerHTML = `
         <header>
           <h1>${escapeHtml(data.header.name)}</h1>
@@ -744,42 +775,13 @@
         </header>
 
         <ul class="tabs" role="tablist" aria-label="Resume sections">
-          <li><button class="tab-btn active" role="tab" aria-selected="true" data-tab="panel-experience">Experience</button></li>
-          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-education">Education</button></li>
-          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-projects">Projects</button></li>
-          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-skills">Skills</button></li>
-          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-github">GitHub</button></li>
+          ${tabButtons}
         </ul>
 
-        <section id="panel-experience" class="panel active">
-          <h2>Experience</h2>
-          ${experienceHtml}
-        </section>
-
-        <section id="panel-education" class="panel">
-          <h2>Education</h2>
-          ${educationHtml}
-        </section>
-
-        <section id="panel-projects" class="panel">
-          <h2>Projects</h2>
-          ${projectsHtml}
-        </section>
-
-        <section id="panel-skills" class="panel">
-          <h2>Technical Skills</h2>
-          ${skillsHtml}
-        </section>
-
-        <section id="panel-github" class="panel">
-          <h2>GitHub Repos</h2>
-          <div id="github-data" class="notice">Loading repositories...</div>
-          <h2>GitHub Contributions</h2>
-          <div id="github-contrib" class="notice">Scanning recent contribution activity...</div>
-        </section>
+        ${panels.join("")}
       `;
 
-      initTabs("panel-experience");
+      initTabs(tabs[0].id);
       loadGithubData(parseGitHubUsername(data.header.github));
     }
 
@@ -790,12 +792,13 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const tex = stripLineComments(await response.text());
+        const sections = extractSections(tex);
         const data = {
           header: parseHeader(tex),
-          experience: parseExperience(sectionBlock(tex, "Experience")),
-          education: parseEducation(sectionBlock(tex, "Education")),
-          projects: parseProjects(sectionBlock(tex, "Projects") || sectionBlock(tex, "Projects \\& Contributions")),
-          skills: parseSkills(sectionBlock(tex, "Technical Skills"))
+          experience: parseExperience(sections["Experience"] || ""),
+          projects: parseProjects(sections["Projects"] || sections["Projects & Contributions"] || ""),
+          skills: parseSkills(sections["Technical Skills"] || ""),
+          speaking: parseSpeaking(sections["Speaking"] || "")
         };
 
         render(data);
