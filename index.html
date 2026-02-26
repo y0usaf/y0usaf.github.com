@@ -415,12 +415,103 @@
         ? `<div class="repo-grid">${repoCards}</div>`
         : "<div class=\"notice\">No public repositories found.</div>";
 
+      const repoForkCache = new Map();
+      async function isForkRepo(fullName) {
+        if (!fullName) return false;
+        if (repoForkCache.has(fullName)) return repoForkCache.get(fullName);
+        try {
+          const details = await fetchJson(`https://api.github.com/repos/${fullName}`);
+          const isFork = !!details?.fork;
+          repoForkCache.set(fullName, isFork);
+          return isFork;
+        } catch (_err) {
+          repoForkCache.set(fullName, false);
+          return false;
+        }
+      }
+
+      const contributions = new Map();
       const contributionRepos = new Map();
       for (const event of events) {
         const fullName = event?.repo?.name || "";
         if (!fullName.includes("/")) continue;
         const owner = fullName.split("/")[0];
         if (!owner || owner.toLowerCase() === activeUser.toLowerCase()) continue;
+
+        let contribution = null;
+        if (event?.type === "PullRequestEvent" && event?.payload?.number) {
+          const number = event.payload.number;
+          contribution = {
+            key: `${fullName}:pr:${number}`,
+            fullName,
+            title: `${fullName}#${number}`,
+            kind: "Pull request",
+            action: event?.payload?.action || "updated",
+            url: `https://github.com/${fullName}/pull/${number}`,
+            createdAt: event.created_at
+          };
+        } else if (event?.type === "IssuesEvent" && event?.payload?.issue?.html_url) {
+          const issue = event.payload.issue;
+          contribution = {
+            key: `${fullName}:issue:${issue.number}`,
+            fullName,
+            title: `${fullName}#${issue.number}`,
+            kind: "Issue",
+            action: event?.payload?.action || "updated",
+            url: issue.html_url,
+            createdAt: event.created_at
+          };
+        } else if (event?.type === "DiscussionEvent" && event?.payload?.discussion?.html_url) {
+          const discussion = event.payload.discussion;
+          contribution = {
+            key: `${fullName}:discussion:${discussion.number}`,
+            fullName,
+            title: discussion.title || `${fullName} discussion #${discussion.number}`,
+            kind: "Discussion",
+            action: event?.payload?.action || "updated",
+            url: discussion.html_url,
+            createdAt: event.created_at
+          };
+        } else if (event?.type === "IssueCommentEvent" && event?.payload?.issue?.html_url) {
+          const issue = event.payload.issue;
+          const isPr = !!issue.pull_request;
+          contribution = {
+            key: `${fullName}:${isPr ? "pr-comment" : "issue-comment"}:${issue.number}`,
+            fullName,
+            title: `${fullName}#${issue.number}`,
+            kind: isPr ? "PR comment" : "Issue comment",
+            action: "commented",
+            url: issue.html_url,
+            createdAt: event.created_at
+          };
+        } else if (event?.type === "PullRequestReviewEvent" && event?.payload?.pull_request?.html_url) {
+          const pr = event.payload.pull_request;
+          contribution = {
+            key: `${fullName}:pr-review:${pr.number}`,
+            fullName,
+            title: `${fullName}#${pr.number}`,
+            kind: "PR review",
+            action: event?.payload?.action || "reviewed",
+            url: pr.html_url,
+            createdAt: event.created_at
+          };
+        } else if (event?.type === "PullRequestReviewCommentEvent" && event?.payload?.pull_request?.html_url) {
+          const pr = event.payload.pull_request;
+          contribution = {
+            key: `${fullName}:pr-review-comment:${pr.number}`,
+            fullName,
+            title: `${fullName}#${pr.number}`,
+            kind: "PR review comment",
+            action: "commented",
+            url: pr.html_url,
+            createdAt: event.created_at
+          };
+        }
+
+        if (contribution && !contributions.has(contribution.key)) {
+          contributions.set(contribution.key, contribution);
+        }
+
         if (!contributionRepos.has(fullName)) {
           contributionRepos.set(fullName, {
             fullName,
@@ -430,20 +521,47 @@
         }
       }
 
-      const contribCards = [...contributionRepos.values()]
+      const repoNames = new Set([
+        ...[...contributions.values()].map((item) => item.fullName).filter(Boolean),
+        ...[...contributionRepos.values()].map((item) => item.fullName).filter(Boolean)
+      ]);
+      const forkChecks = await Promise.all(
+        [...repoNames].map(async (name) => [name, await isForkRepo(name)])
+      );
+      const forkMap = new Map(forkChecks);
+
+      const contributionCards = [...contributions.values()]
+        .filter((item) => !forkMap.get(item.fullName))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 8)
+        .map((item) => `
+          <article class="contrib-card">
+            <h3><a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a></h3>
+            <p class="contrib-meta">${escapeHtml(item.kind)} ${escapeHtml(item.action)} · ${escapeHtml(formatDate(item.createdAt))}</p>
+          </article>
+        `)
+        .join("");
+
+      if (contributionCards) {
+        contribApp.innerHTML = `<div class="contrib-grid">${contributionCards}</div>`;
+        return;
+      }
+
+      const fallbackCards = [...contributionRepos.values()]
+        .filter((item) => !forkMap.get(item.fullName))
         .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
         .slice(0, 8)
         .map((item) => `
           <article class="contrib-card">
             <h3><a href="https://github.com/${escapeHtml(item.fullName)}" target="_blank" rel="noreferrer">${escapeHtml(item.fullName)}</a></h3>
-            <p class="contrib-meta">Recent contribution activity observed · ${escapeHtml(formatDate(item.lastSeen))}</p>
+            <p class="contrib-meta">External activity found · ${escapeHtml(formatDate(item.lastSeen))}</p>
           </article>
         `)
         .join("");
 
-      contribApp.innerHTML = contribCards
-        ? `<div class="contrib-grid">${contribCards}</div>`
-        : "<div class=\"notice\">No recent public contributions outside your own repos were detected in the available GitHub event window.</div>";
+      contribApp.innerHTML = fallbackCards
+        ? `<div class="contrib-grid">${fallbackCards}</div>`
+        : "<div class=\"notice\">No recent external contributions found in GitHub's public event window.</div>";
     }
 
     function render(data) {
@@ -543,7 +661,7 @@
 
         <section id="contributions">
           <h2>Recent External Contributions</h2>
-          <div id="github-contrib" class="notice">Scanning recent public contribution activity...</div>
+          <div id="github-contrib" class="notice">Scanning recent contribution activity...</div>
         </section>
       `;
 
