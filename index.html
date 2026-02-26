@@ -4,14 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Resume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Serif:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --ink: #111111;
-      --paper: #f6f1e8;
-      --card: #fffef8;
-      --accent: #1b5e5a;
-      --line: #d5ccb9;
-      --muted: #5b5b57;
+      --ink: #1f2327;
+      --paper: #f3f0e9;
+      --card: #eceff1;
+      --steel: #5f6b76;
+      --line: #b0b7be;
+      --mango: #f29f05;
+      --mango-deep: #d87900;
+      --muted: #4b535a;
     }
 
     * { box-sizing: border-box; }
@@ -20,11 +25,13 @@
       margin: 0;
       color: var(--ink);
       background:
-        radial-gradient(circle at 20% 0%, #e6dcc8, transparent 40%),
-        radial-gradient(circle at 80% 15%, #dce8d4, transparent 35%),
+        radial-gradient(circle at 20% 0%, #cfd6dd 0%, transparent 36%),
+        radial-gradient(circle at 85% 8%, #ffd183 0%, transparent 32%),
+        linear-gradient(120deg, #e1e5e8 0%, #f3f0e9 58%, #f7e4bf 100%),
         var(--paper);
-      font-family: "Georgia", "Times New Roman", serif;
+      font-family: "IBM Plex Serif", Georgia, serif;
       line-height: 1.5;
+      min-height: 100vh;
     }
 
     .shell {
@@ -34,16 +41,35 @@
     }
 
     header {
-      border-bottom: 2px solid var(--line);
+      border: 1px solid var(--line);
+      background: linear-gradient(140deg, #dce1e6 0%, #f7d08b 100%);
+      border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(55, 65, 74, 0.16);
       margin-bottom: 28px;
-      padding-bottom: 20px;
+      padding: 18px 20px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::after {
+      content: "";
+      position: absolute;
+      right: -50px;
+      top: -50px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(242, 159, 5, 0.46) 0%, rgba(242, 159, 5, 0) 65%);
+      pointer-events: none;
     }
 
     h1 {
       margin: 0;
       font-size: clamp(2rem, 4.2vw, 3.1rem);
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      font-weight: 700;
     }
 
     .contact {
@@ -52,33 +78,45 @@
       gap: 10px 14px;
       margin-top: 14px;
       color: var(--muted);
-      font-size: 0.98rem;
+      font-size: 0.95rem;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      position: relative;
+      z-index: 1;
     }
 
     .contact a {
-      color: var(--accent);
+      color: #26323d;
       text-decoration: none;
-      border-bottom: 1px solid transparent;
+      border-bottom: 1px solid rgba(38, 50, 61, 0.2);
     }
 
-    .contact a:hover { border-bottom-color: var(--accent); }
+    .contact a:hover { border-bottom-color: var(--mango-deep); color: var(--mango-deep); }
 
     section { margin-top: 24px; }
 
     h2 {
       margin: 0 0 14px;
       font-size: 1.1rem;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--steel);
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      font-weight: 700;
     }
 
     .card {
-      background: var(--card);
+      background: linear-gradient(180deg, #f7f8f9 0%, var(--card) 100%);
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 16px;
       margin-bottom: 14px;
+      box-shadow: 0 6px 20px rgba(52, 61, 69, 0.1);
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 26px rgba(52, 61, 69, 0.14);
     }
 
     .card-top, .role-top {
@@ -90,28 +128,40 @@
     }
 
     h3, h4 { margin: 0; }
-    h3 { font-size: 1.08rem; }
-    h4 { font-size: 1rem; margin-top: 10px; }
+    h3 {
+      font-size: 1.08rem;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      font-weight: 700;
+    }
+    h4 {
+      font-size: 1rem;
+      margin-top: 12px;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      font-weight: 500;
+      color: #2e3942;
+    }
 
     p { margin: 4px 0 0; }
     .meta { color: var(--muted); }
 
     ul { margin: 8px 0 0; padding-left: 18px; }
     li { margin: 5px 0; }
+    li::marker { color: var(--mango-deep); }
 
     .skill-row {
-      border-bottom: 1px solid var(--line);
-      padding: 10px 0;
+      border-bottom: 1px solid #c7cdd3;
+      padding: 11px 0;
     }
 
     .skill-row:last-child { border-bottom: 0; }
 
     .notice {
-      background: var(--card);
+      background: linear-gradient(135deg, #e2e7eb 0%, #ffdca1 100%);
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 16px;
-      color: var(--muted);
+      color: #2d3842;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
     }
 
     @media (max-width: 680px) {
@@ -139,21 +189,21 @@
 
     function cleanTex(text) {
       return text
-        .replaceAll("\\\\&", "&")
-        .replaceAll("\\\\%", "%")
+        .replaceAll("\\&", "&")
+        .replaceAll("\\%", "%")
         .replaceAll("~", " ")
         .replace(/\$\|\$/g, " | ")
         .replace(/\$/g, "")
-        .replace(/\\\\textbf\{([^{}]*)\}/g, "$1")
-        .replace(/\\\\textit\{([^{}]*)\}/g, "$1")
-        .replace(/\\\\emph\{([^{}]*)\}/g, "$1")
-        .replace(/\\\\underline\{([^{}]*)\}/g, "$1")
-        .replace(/\\\\href\{([^{}]*)\}\{([^{}]*)\}/g, "$2")
-        .replace(/\\\\scshape/g, "")
-        .replace(/\\\\Huge/g, "")
-        .replace(/\\\\small/g, "")
-        .replace(/\\\\vspace\{[^{}]*\}/g, "")
-        .replace(/\\\\[a-zA-Z]+/g, "")
+        .replace(/\\textbf\{([^{}]*)\}/g, "$1")
+        .replace(/\\textit\{([^{}]*)\}/g, "$1")
+        .replace(/\\emph\{([^{}]*)\}/g, "$1")
+        .replace(/\\underline\{([^{}]*)\}/g, "$1")
+        .replace(/\\href\{([^{}]*)\}\{([^{}]*)\}/g, "$2")
+        .replace(/\\scshape/g, "")
+        .replace(/\\Huge/g, "")
+        .replace(/\\small/g, "")
+        .replace(/\\vspace\{[^{}]*\}/g, "")
+        .replace(/\\[a-zA-Z]+/g, "")
         .replace(/[{}]/g, "")
         .replace(/\s+/g, " ")
         .trim();
@@ -164,7 +214,15 @@
     }
 
     function sectionBlock(tex, title) {
-      const re = new RegExp(`\\\\section\\\\{${title.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")}\\\\}([\\s\\S]*?)(?=\\\\section\\\\{|\\\\end\\\\{document\\\\})`);
+      const sections = {
+        "Experience": /\\section\{Experience\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
+        "Education": /\\section\{Education\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
+        "Projects": /\\section\{Projects\}([\s\S]*?)(?=\\section\{|\\end\{document\})/,
+        "Technical Skills": /\\section\{Technical Skills\}([\s\S]*?)(?=\\section\{|\\end\{document\})/
+      };
+
+      const re = sections[title];
+      if (!re) return "";
       const match = tex.match(re);
       return match ? match[1] : "";
     }
