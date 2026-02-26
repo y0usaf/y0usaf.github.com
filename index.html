@@ -155,6 +155,42 @@
 
     .skill-row:last-child { border-bottom: 0; }
 
+    .repo-grid, .contrib-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+
+    .repo-card, .contrib-card {
+      background: linear-gradient(180deg, #f6f8fa 0%, #e9edf0 100%);
+      border: 1px solid #bac1c8;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .repo-card h3, .contrib-card h3 {
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .repo-card a, .contrib-card a {
+      color: #2a3440;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(42, 52, 64, 0.25);
+    }
+
+    .repo-card a:hover, .contrib-card a:hover {
+      color: var(--mango-deep);
+      border-bottom-color: var(--mango-deep);
+    }
+
+    .repo-meta, .contrib-meta {
+      margin-top: 6px;
+      color: #55606a;
+      font-size: 0.9rem;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+    }
+
     .notice {
       background: linear-gradient(135deg, #e2e7eb 0%, #ffdca1 100%);
       border: 1px solid var(--line);
@@ -308,6 +344,108 @@
       }));
     }
 
+    function parseGitHubUsername(url) {
+      if (!url) return "";
+      const cleaned = url.trim();
+      const m = cleaned.match(/^https?:\/\/github\.com\/([^/?#]+)/i);
+      return m ? m[1] : "";
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "Unknown date";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url, {
+        headers: { Accept: "application/vnd.github+json" },
+        cache: "no-store"
+      });
+      if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+      return response.json();
+    }
+
+    async function loadGithubData(primaryUser) {
+      const fallbackUser = "y0usaf";
+      const usersToTry = [primaryUser, fallbackUser].filter(Boolean);
+      const app = document.getElementById("github-data");
+      const contribApp = document.getElementById("github-contrib");
+      if (!app || !contribApp) return;
+
+      let repos = null;
+      let events = null;
+      let activeUser = "";
+
+      for (const user of usersToTry) {
+        try {
+          const [repoData, eventData] = await Promise.all([
+            fetchJson(`https://api.github.com/users/${user}/repos?sort=updated&per_page=8`),
+            fetchJson(`https://api.github.com/users/${user}/events/public?per_page=100`)
+          ]);
+          repos = repoData;
+          events = eventData;
+          activeUser = user;
+          break;
+        } catch (_err) {
+          // Try fallback username next.
+        }
+      }
+
+      if (!repos || !events) {
+        app.innerHTML = "<div class=\"notice\">Unable to load repositories from GitHub API right now.</div>";
+        contribApp.innerHTML = "<div class=\"notice\">Unable to infer contribution targets from GitHub activity right now.</div>";
+        return;
+      }
+
+      const repoCards = repos
+        .filter((repo) => !repo.fork)
+        .slice(0, 6)
+        .map((repo) => `
+          <article class="repo-card">
+            <h3><a href="${escapeHtml(repo.html_url)}" target="_blank" rel="noreferrer">${escapeHtml(repo.name)}</a></h3>
+            <p>${escapeHtml(repo.description || "No description provided.")}</p>
+            <p class="repo-meta">${escapeHtml(repo.language || "No language")} · ★ ${repo.stargazers_count} · Updated ${escapeHtml(formatDate(repo.updated_at))}</p>
+          </article>
+        `)
+        .join("");
+
+      app.innerHTML = repoCards
+        ? `<div class="repo-grid">${repoCards}</div>`
+        : "<div class=\"notice\">No public repositories found.</div>";
+
+      const contributionRepos = new Map();
+      for (const event of events) {
+        const fullName = event?.repo?.name || "";
+        if (!fullName.includes("/")) continue;
+        const owner = fullName.split("/")[0];
+        if (!owner || owner.toLowerCase() === activeUser.toLowerCase()) continue;
+        if (!contributionRepos.has(fullName)) {
+          contributionRepos.set(fullName, {
+            fullName,
+            owner,
+            lastSeen: event.created_at
+          });
+        }
+      }
+
+      const contribCards = [...contributionRepos.values()]
+        .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
+        .slice(0, 8)
+        .map((item) => `
+          <article class="contrib-card">
+            <h3><a href="https://github.com/${escapeHtml(item.fullName)}" target="_blank" rel="noreferrer">${escapeHtml(item.fullName)}</a></h3>
+            <p class="contrib-meta">Recent contribution activity observed · ${escapeHtml(formatDate(item.lastSeen))}</p>
+          </article>
+        `)
+        .join("");
+
+      contribApp.innerHTML = contribCards
+        ? `<div class="contrib-grid">${contribCards}</div>`
+        : "<div class=\"notice\">No recent public contributions outside your own repos were detected in the available GitHub event window.</div>";
+    }
+
     function render(data) {
       const app = document.getElementById("app");
       document.title = data.header.name || "Resume";
@@ -397,7 +535,19 @@
           <h2>Technical Skills</h2>
           ${skillsHtml}
         </section>
+
+        <section id="github-projects">
+          <h2>Public GitHub Repositories</h2>
+          <div id="github-data" class="notice">Loading repositories...</div>
+        </section>
+
+        <section id="contributions">
+          <h2>Recent External Contributions</h2>
+          <div id="github-contrib" class="notice">Scanning recent public contribution activity...</div>
+        </section>
       `;
+
+      loadGithubData(parseGitHubUsername(data.header.github));
     }
 
     async function loadResume() {
