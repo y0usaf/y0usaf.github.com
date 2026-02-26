@@ -309,8 +309,23 @@
       const center = tex.match(/\\begin\{center\}([\s\S]*?)\\end\{center\}/);
       const block = center ? center[1] : "";
 
-      const nameMatch = block.match(/\\textbf\{\\Huge\s+\\scshape\s+([^}]*)\}/);
-      const name = nameMatch ? cleanTex(nameMatch[1]) : "Your Name";
+      let name = "Sami Ansari";
+      const oldNameMatch = block.match(/\\textbf\{\\Huge\s+\\scshape\s+([^}]*)\}/);
+      const modernNameMatch = block.match(/\{\\LARGE\\bfseries\s+([^}]*)\}/);
+      if (oldNameMatch) {
+        name = cleanTex(oldNameMatch[1]);
+      } else if (modernNameMatch) {
+        name = cleanTex(modernNameMatch[1]);
+      } else {
+        const firstLine = block
+          .split("\n")
+          .map((line) => line.trim())
+          .find((line) => line && !line.includes("\\href") && !line.includes("\\rule"));
+        if (firstLine) {
+          const fallback = cleanTex(firstLine);
+          if (fallback) name = fallback;
+        }
+      }
 
       const hrefs = [...block.matchAll(/\\href\{([^{}]+)\}\{((?:[^{}]|\{[^{}]*\})*)\}/g)];
       let email = "";
@@ -327,8 +342,14 @@
         else if (link.includes("github.com")) github = link;
       }
 
-      const phoneMatch = block.match(/\\small\s*([^$\\]+)/);
-      const phone = phoneMatch ? cleanTex(phoneMatch[1]) : "";
+      let phone = "";
+      const telMatch = block.match(/\\href\{tel:[^}]*\}\{([^}]*)\}/);
+      if (telMatch) {
+        phone = cleanTex(telMatch[1]);
+      } else {
+        const phoneMatch = block.match(/\\small\s*([^$\\]+)/);
+        phone = phoneMatch ? cleanTex(phoneMatch[1]) : "";
+      }
 
       return { name, phone, email, linkedin, github };
     }
