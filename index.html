@@ -734,8 +734,8 @@
         panels.push(`<section id="panel-speaking" class="panel"><h2>Speaking</h2>${speakingHtml}</section>`);
       }
 
-      tabs.push({ id: "panel-github", label: "GitHub" });
-      panels.push(`
+      tabs.unshift({ id: "panel-github", label: "GitHub" });
+      panels.unshift(`
         <section id="panel-github" class="panel">
           <h2>GitHub Repos</h2>
           <div id="github-data" class="notice">Loading repositories...</div>
@@ -761,7 +761,7 @@
         ${panels.join("")}
       `;
 
-      initTabs(tabs[0].id);
+      initTabs("panel-github");
       loadGithubData(parseGitHubUsername(data.header.github));
     }
 
