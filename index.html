@@ -118,9 +118,15 @@
 
     .skill-row:last-child { border-bottom: 0; }
 
-    .repo-grid, .contrib-grid {
+    .repo-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+
+    .contrib-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
     }
 
@@ -207,6 +213,11 @@
     @media (max-width: 680px) {
       .shell { padding-top: 32px; }
       .card { padding: 14px; }
+      .contrib-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (min-width: 681px) and (max-width: 980px) {
+      .contrib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -434,6 +445,18 @@
       return response.json();
     }
 
+    async function fetchAllUserRepos(user) {
+      const repos = [];
+      let page = 1;
+      while (true) {
+        const batch = await fetchJson(`https://api.github.com/users/${user}/repos?type=public&per_page=100&page=${page}`);
+        repos.push(...batch);
+        if (batch.length < 100) break;
+        page += 1;
+      }
+      return repos;
+    }
+
     function activateTab(tabId) {
       const buttons = document.querySelectorAll(".tab-btn");
       const panels = document.querySelectorAll(".panel");
@@ -469,7 +492,7 @@
       for (const user of usersToTry) {
         try {
           const [repoData, eventData] = await Promise.all([
-            fetchJson(`https://api.github.com/users/${user}/repos?sort=updated&per_page=8`),
+            fetchAllUserRepos(user),
             fetchJson(`https://api.github.com/users/${user}/events/public?per_page=100`)
           ]);
           repos = repoData;
@@ -488,8 +511,11 @@
       }
 
       const repoCards = repos
-        .filter((repo) => !repo.fork)
-        .slice(0, 6)
+        .sort((a, b) => {
+          const starDiff = (b.stargazers_count || 0) - (a.stargazers_count || 0);
+          if (starDiff !== 0) return starDiff;
+          return new Date(b.updated_at) - new Date(a.updated_at);
+        })
         .map((repo) => `
           <article class="repo-card">
             <h3><a href="${escapeHtml(repo.html_url)}" target="_blank" rel="noreferrer">${escapeHtml(repo.name)}</a></h3>
@@ -621,7 +647,7 @@
       const contributionCards = [...contributions.values()]
         .filter((item) => !forkMap.get(item.fullName))
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 8)
+        .slice(0, 9)
         .map((item) => `
           <article class="contrib-card">
             <h3><a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a></h3>
@@ -638,7 +664,7 @@
       const fallbackCards = [...contributionRepos.values()]
         .filter((item) => !forkMap.get(item.fullName))
         .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
-        .slice(0, 8)
+        .slice(0, 9)
         .map((item) => `
           <article class="contrib-card">
             <h3><a href="https://github.com/${escapeHtml(item.fullName)}" target="_blank" rel="noreferrer">${escapeHtml(item.fullName)}</a></h3>
@@ -739,7 +765,7 @@
         <section id="panel-github" class="panel">
           <h2>GitHub Repos</h2>
           <div id="github-data" class="notice">Loading repositories...</div>
-          <h2>GitHub Contributions</h2>
+          <h2>Recent Contributions</h2>
           <div id="github-contrib" class="notice">Scanning recent contribution activity...</div>
         </section>
       `);
