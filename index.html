@@ -200,6 +200,51 @@
       font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
     }
 
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 14px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .tab-btn {
+      border: 1px solid #9ea7af;
+      background: linear-gradient(180deg, #f7c56b 0%, #e4e8eb 100%);
+      color: #2a3440;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .tab-btn:hover {
+      border-color: #76828e;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(180deg, #eea626 0%, #d8dee3 100%);
+      border-color: #5a6672;
+      color: #1f2933;
+    }
+
+    .panel {
+      display: none;
+      animation: panelIn 180ms ease;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     @media (max-width: 680px) {
       .shell { padding-top: 32px; }
       .card { padding: 14px; }
@@ -365,6 +410,27 @@
       });
       if (!response.ok) throw new Error(`GitHub API ${response.status}`);
       return response.json();
+    }
+
+    function activateTab(tabId) {
+      const buttons = document.querySelectorAll(".tab-btn");
+      const panels = document.querySelectorAll(".panel");
+      buttons.forEach((btn) => {
+        const isActive = btn.dataset.tab === tabId;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-selected", isActive ? "true" : "false");
+      });
+      panels.forEach((panel) => {
+        panel.classList.toggle("active", panel.id === tabId);
+      });
+    }
+
+    function initTabs(defaultTab = "panel-experience") {
+      const buttons = document.querySelectorAll(".tab-btn");
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+      });
+      activateTab(defaultTab);
     }
 
     async function loadGithubData(primaryUser) {
@@ -634,37 +700,47 @@
           <div class="contact">${contact.join(" ")}</div>
         </header>
 
-        <section id="experience">
+        <ul class="tabs" role="tablist" aria-label="Resume sections">
+          <li><button class="tab-btn active" role="tab" aria-selected="true" data-tab="panel-experience">Experience</button></li>
+          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-education">Education</button></li>
+          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-projects">Projects</button></li>
+          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-skills">Skills</button></li>
+          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-github">GitHub</button></li>
+          <li><button class="tab-btn" role="tab" aria-selected="false" data-tab="panel-contrib">Contributions</button></li>
+        </ul>
+
+        <section id="panel-experience" class="panel active">
           <h2>Experience</h2>
           ${experienceHtml}
         </section>
 
-        <section id="education">
+        <section id="panel-education" class="panel">
           <h2>Education</h2>
           ${educationHtml}
         </section>
 
-        <section id="projects">
+        <section id="panel-projects" class="panel">
           <h2>Projects</h2>
           ${projectsHtml}
         </section>
 
-        <section id="skills">
+        <section id="panel-skills" class="panel">
           <h2>Technical Skills</h2>
           ${skillsHtml}
         </section>
 
-        <section id="github-projects">
+        <section id="panel-github" class="panel">
           <h2>Public GitHub Repositories</h2>
           <div id="github-data" class="notice">Loading repositories...</div>
         </section>
 
-        <section id="contributions">
+        <section id="panel-contrib" class="panel">
           <h2>Recent External Contributions</h2>
           <div id="github-contrib" class="notice">Scanning recent contribution activity...</div>
         </section>
       `;
 
+      initTabs("panel-experience");
       loadGithubData(parseGitHubUsername(data.header.github));
     }
 
