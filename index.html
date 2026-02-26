@@ -44,14 +44,15 @@
 
     .identity {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: space-between;
-      gap: 14px;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
     }
 
     .identity-main {
       min-width: 0;
-      flex: 1;
     }
 
     h1 {
@@ -64,6 +65,7 @@
     .contact {
       display: flex;
       flex-wrap: wrap;
+      justify-content: center;
       gap: 10px 14px;
       margin-top: 14px;
       color: var(--muted);
@@ -83,8 +85,8 @@
       border-radius: 999px;
       border: 1px solid var(--line);
       overflow: hidden;
-      width: 60px;
-      height: 60px;
+      width: 72px;
+      height: 72px;
       flex: 0 0 auto;
       background: #f7f7f7;
     }
