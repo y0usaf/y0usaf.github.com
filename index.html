@@ -544,13 +544,13 @@
         .sort((a, b) => {
           const starDiff = (b.stargazers_count || 0) - (a.stargazers_count || 0);
           if (starDiff !== 0) return starDiff;
-          return new Date(b.updated_at) - new Date(a.updated_at);
+          return a.name.localeCompare(b.name);
         })
         .map((repo) => `
           <article class="repo-card">
             <h3><a href="${escapeHtml(repo.html_url)}" target="_blank" rel="noreferrer">${escapeHtml(repo.name)}</a></h3>
             <p>${escapeHtml(repo.description || "No description provided.")}</p>
-            <p class="repo-meta">${escapeHtml(repo.language || "No language")} · ★ ${repo.stargazers_count} · Updated ${escapeHtml(formatDate(repo.updated_at))}</p>
+            <p class="repo-meta">${escapeHtml(repo.language || "No language")}${repo.stargazers_count > 0 ? ` · ★ ${repo.stargazers_count}` : ""}</p>
           </article>
         `)
         .join("");
